@@ -8,15 +8,14 @@ module RubyEventStore
       end
 
       def call(**options)
-        gateway = @env.container.gateways.fetch(options.delete(:gateway){:default})
-
         yield(queue = [])
 
-        commit!(gateway, queue, options)
+        commit!(options.delete(:gateway){:default}, queue, options)
       end
 
       def commit!(gateway, queue, **options)
-        gateway.connection.transaction(options) { queue.each(&:commit) }
+        gateway = @env.container.gateways.fetch(gateway)
+        gateway.transaction(options) { queue.each(&:commit) }
       end
     end
   end

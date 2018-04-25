@@ -1,7 +1,6 @@
 require 'rom/sql'
 require 'ruby_event_store/rom'
 require_relative 'adapters/sql/index_violation_detector'
-require_relative 'adapters/sql/unit_of_work'
 require_relative 'adapters/sql/relations/events'
 require_relative 'adapters/sql/relations/stream_entries'
 
@@ -15,12 +14,7 @@ module RubyEventStore
         end
 
         def configure(env)
-          # See: https://github.com/jeremyevans/sequel/blob/master/doc/transactions.rdoc
-          env.register_unit_of_work_options(
-            class: UnitOfWork,
-            savepoint: true,
-            retry_on: Sequel::SerializationFailure
-          )
+          env.register_unit_of_work_options(savepoint: true)
 
           env.register_error_handler :unique_violation, -> ex {
             case ex
