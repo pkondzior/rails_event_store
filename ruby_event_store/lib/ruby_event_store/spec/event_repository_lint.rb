@@ -531,6 +531,7 @@ RSpec.shared_examples :event_repository do |repository_class|
 
       fail_occurred = 0
       wait_for_it  = true
+      $stdout.sync = true
 
       threads = concurrency_level.times.map do |i|
         Thread.new do
@@ -538,6 +539,7 @@ RSpec.shared_examples :event_repository do |repository_class|
           100.times do |j|
             begin
               eid = "0000000#{i}-#{sprintf("%04d", j)}-0000-0000-000000000000"
+              puts eid
               repository.append_to_stream([
                 SRecord.new(event_id: eid),
               ], RubyEventStore::Stream.new('stream'), RubyEventStore::ExpectedVersion.auto)

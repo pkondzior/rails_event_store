@@ -23,7 +23,12 @@ rom = ROM::Configuration.new(
   max_connections: ENV['DATABASE_URL'] =~ /sqlite/ ? 1 : 5,
   preconnect: :concurrently
 )
-# rom.default.use_logger Logger.new(STDOUT)
+
+logger = Logger.new('db.log')
+logger.formatter = ->(severity, time, progname, msg) {
+  "[#{Thread.current.object_id}] [#{time.strftime("%Y-%m-%dT%H:%M:%S.%6N")}] #{msg}\n"
+}
+rom.default.use_logger logger
 rom.default.run_migrations if adapter_name == :sql
 
 RubyEventStore::ROM.env = RubyEventStore::ROM.setup(rom)
