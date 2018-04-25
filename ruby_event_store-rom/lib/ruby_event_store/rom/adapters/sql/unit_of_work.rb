@@ -19,11 +19,6 @@ module RubyEventStore
           # which doesn't bubble up so that Sequel retries transactions
           # with the :retry_on option when there's a deadlock.
 
-          options.merge!(
-            retry_on: Sequel::SerializationFailure, # Retry on MySQL Deadlocks
-            before_retry: -> (num, ex) { puts "RETRY [#{ex.class.name}]: #{ex.message}" }
-          )
-  
           gateway.transaction(options) do
             changesets.each do |changeset|
               changeset.relation.multi_insert(changeset.to_a)
