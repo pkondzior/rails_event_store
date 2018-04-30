@@ -15,9 +15,11 @@ module RubyEventStore
     end
 
     def publish_events(events, stream_name: GLOBAL_STREAM, expected_version: :any)
-      append_to_stream(events, stream_name: stream_name, expected_version: expected_version)
-      events.each do |ev|
-        event_broker.notify_subscribers(ev)
+      events = prepare_events(events)
+      serialized_events = serialize_events(events)
+      append_to_stream_serialized(serialized_events, stream_name: stream_name, expected_version: expected_version)
+      events.zip(serialized_events) do |event, serialized_event|
+        event_broker.notify_subscribers(event, serialized_event)
       end
       :ok
     end
@@ -27,9 +29,8 @@ module RubyEventStore
     end
 
     def append_to_stream(events, stream_name: GLOBAL_STREAM, expected_version: :any)
-      events = normalize_to_array(events)
-      events.each{|event| enrich_event_metadata(event) }
-      repository.append_to_stream(serialized_events(events), Stream.new(stream_name), ExpectedVersion.new(expected_version))
+      serialized_events = serialize_events(prepare_events(events))
+      append_to_stream_serialized(serialized_events, stream_name: stream_name, expected_version: expected_version)
       :ok
     end
 
@@ -44,27 +45,27 @@ module RubyEventStore
     end
 
     def read_events_forward(stream_name, start: :head, count: page_size)
-      deserialized_events(read.stream(stream_name).limit(count).from(start).each)
+      deserialize_events(read.stream(stream_name).limit(count).from(start).each)
     end
 
     def read_events_backward(stream_name, start: :head, count: page_size)
-      deserialized_events(read.stream(stream_name).limit(count).from(start).backward.each)
+      deserialize_events(read.stream(stream_name).limit(count).from(start).backward.each)
     end
 
     def read_stream_events_forward(stream_name)
-      deserialized_events(read.stream(stream_name).each)
+      deserialize_events(read.stream(stream_name).each)
     end
 
     def read_stream_events_backward(stream_name)
-      deserialized_events(read.stream(stream_name).backward.each)
+      deserialize_events(read.stream(stream_name).backward.each)
     end
 
     def read_all_streams_forward(start: :head, count: page_size)
-      deserialized_events(read.limit(count).from(start).each)
+      deserialize_events(read.limit(count).from(start).each)
     end
 
     def read_all_streams_backward(start: :head, count: page_size)
-      deserialized_events(read.limit(count).from(start).backward.each)
+      deserialize_events(read.limit(count).from(start).backward.each)
     end
 
     def read_event(event_id)
@@ -173,13 +174,13 @@ module RubyEventStore
 
     private
 
-    def serialized_events(events)
+    def serialize_events(events)
       events.map do |ev|
         mapper.event_to_serialized_record(ev)
       end
     end
 
-    def deserialized_events(serialized_events)
+    def deserialize_events(serialized_events)
       serialized_events.map do |sev|
         deserialize_event(sev)
       end
@@ -203,6 +204,16 @@ module RubyEventStore
         md = metadata_proc.call || {}
         md.each{|k,v| event.metadata[k]=(v) }
       end
+    end
+
+    def append_to_stream_serialized(serialized_events, stream_name: GLOBAL_STREAM, expected_version: :any)
+      repository.append_to_stream(serialized_events, Stream.new(stream_name), ExpectedVersion.new(expected_version))
+    end
+
+    def prepare_events(events)
+      events = normalize_to_array(events)
+      events.each{|event| enrich_event_metadata(event) }
+      events
     end
 
     attr_reader :repository, :mapper, :event_broker, :clock, :metadata_proc, :page_size
